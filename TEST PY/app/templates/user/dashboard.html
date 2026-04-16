@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}User Dashboard | PM Suite{% endblock %}
+{% block heading %}User Dashboard{% endblock %}
+
+{% block content %}
+<section class="stats-grid">
+  <div class="stat-card">
+    <h3>Assigned Projects</h3>
+    <p>{{ stats.total_projects }}</p>
+  </div>
+  <div class="stat-card">
+    <h3>Completed Tasks</h3>
+    <p class="success">{{ stats.completed_tasks }}</p>
+  </div>
+  <div class="stat-card">
+    <h3>Pending Tasks</h3>
+    <p class="warning">{{ stats.pending_tasks }}</p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <h2>My Projects</h2>
+  </div>
+  <div class="project-chip-wrap">
+    {% for project in assigned_projects %}
+      <span class="project-chip">{{ project.name }}</span>
+    {% else %}
+      <span class="muted">No assigned projects yet.</span>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <h2>Task Timeline (Gantt)</h2>
+    <span class="muted">{{ timeline_start }} to {{ timeline_end }}</span>
+  </div>
+  <div class="gantt-wrap">
+    {% if gantt_data %}
+      {% for item in gantt_data %}
+        <div class="gantt-row">
+          <div class="gantt-label">
+            <strong>{{ item.title }}</strong>
+            <small>{{ item.project_name }} | {{ item.start }} to {{ item.end or "No Deadline" }}</small>
+          </div>
+          <div class="gantt-track">
+            <div
+              class="gantt-bar {{ item.status|lower|replace(' ', '-') }}"
+              style="left: {{ item.offset_pct }}%; width: {{ item.width_pct }}%;"
+              title="{{ item.status }}"
+            >
+              {{ item.status }}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">No tasks available for timeline.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <h2>My Tasks</h2>
+  </div>
+
+  <form method="GET" class="filters">
+    <input type="text" name="search" placeholder="Search by task/project..." value="{{ filters.search }}" />
+    <select name="status">
+      <option value="">All Statuses</option>
+      {% for value in task_statuses %}
+        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn-primary">Apply</button>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Task</th>
+          <th>Project</th>
+          <th>Status</th>
+          <th>Severity</th>
+          <th>Due Date</th>
+          <th>Subtasks</th>
+          <th>Update</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in task_pagination.items %}
+          <tr>
+            <td>{{ task.title }}</td>
+            <td>{{ task.project.name }}</td>
+            <td><span class="status {{ task.status|lower|replace(' ', '-') }}">{{ task.status }}</span></td>
+            <td>{{ task.severity }}</td>
+            <td>{{ task.due_date or "No Deadline" }}</td>
+            <td>
+              {% if task.subtasks %}
+                <ul class="subtask-list">
+                  {% for subtask in task.subtasks %}
+                    <li>{{ subtask.title }} - <span class="status {{ subtask.status|lower|replace(' ', '-') }}">{{ subtask.status }}</span></li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                <span class="muted">No subtasks</span>
+              {% endif %}
+            </td>
+            <td>
+              <form method="POST" action="{{ url_for('user.update_task_status', task_id=task.id) }}">
+                <select name="status">
+                  {% for value in task_statuses %}
+                    <option value="{{ value }}" {% if task.status == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+                <button class="btn-primary" type="submit">Save</button>
+              </form>
+            </td>
+          </tr>
+          <tr class="comment-row">
+            <td colspan="7">
+              <div class="comment-box">
+                <strong>Remarks / Comments</strong>
+                <div class="comment-list">
+                  {% for comment in task.comments|sort(attribute='created_at', reverse=True) %}
+                    <div class="comment-item">
+                      <p>{{ comment.body }}</p>
+                      <small>{{ comment.user.username }} | {{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                  {% else %}
+                    <p class="muted">No comments added yet.</p>
+                  {% endfor %}
+                </div>
+                <form method="POST" action="{{ url_for('user.add_task_comment', task_id=task.id) }}" class="comment-form">
+                  <input type="text" name="body" placeholder="Add your remark..." required />
+                  <button type="submit" class="btn-light">Add</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="muted">No tasks found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination">
+    {% if task_pagination.has_prev %}
+      <a href="{{ url_for('user.dashboard', page=task_pagination.prev_num, search=filters.search, status=filters.status) }}">Previous</a>
+    {% endif %}
+    <span>Page {{ task_pagination.page }} of {{ task_pagination.pages or 1 }}</span>
+    {% if task_pagination.has_next %}
+      <a href="{{ url_for('user.dashboard', page=task_pagination.next_num, search=filters.search, status=filters.status) }}">Next</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

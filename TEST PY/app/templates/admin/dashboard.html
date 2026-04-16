@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard | PM Suite{% endblock %}
+{% block heading %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<section class="stats-grid">
+  <div class="stat-card">
+    <h3>Total Projects</h3>
+    <p>{{ stats.total_projects }}</p>
+  </div>
+  <div class="stat-card">
+    <h3>Completed Tasks</h3>
+    <p class="success">{{ stats.completed_tasks }}</p>
+  </div>
+  <div class="stat-card">
+    <h3>Pending Tasks</h3>
+    <p class="warning">{{ stats.pending_tasks }}</p>
+  </div>
+  <div class="stat-card">
+    <h3>Overdue Tasks</h3>
+    <p class="danger-text">{{ stats.overdue_tasks }}</p>
+  </div>
+  <div class="stat-card">
+    <h3>No Deadline Tasks</h3>
+    <p>{{ stats.no_deadline_tasks }}</p>
+  </div>
+  <div class="stat-card">
+    <h3>Due Tomorrow</h3>
+    <p class="warning">{{ stats.due_tomorrow_tasks }}</p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <h2>Project Management</h2>
+    <button class="btn-primary" data-modal-target="#createProjectModal">+ New Project</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Timeline</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for project in projects %}
+          <tr>
+            <td>{{ project.name }}</td>
+            <td>{{ project.description or "-" }}</td>
+            <td>{{ project.start_date }} to {{ project.end_date }}</td>
+            <td class="actions">
+              <button
+                class="btn-light"
+                data-modal-target="#editProjectModal"
+                data-project-id="{{ project.id }}"
+                data-project-name="{{ project.name }}"
+                data-project-description="{{ project.description or '' }}"
+                data-project-start="{{ project.start_date }}"
+                data-project-end="{{ project.end_date }}"
+              >
+                Edit
+              </button>
+              <form method="POST" action="{{ url_for('admin.delete_project', project_id=project.id) }}">
+                <button type="submit" class="btn-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="muted">No projects available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <h2>Task Management</h2>
+    <div class="header-actions">
+      <button class="btn-primary" data-modal-target="#createTaskModal">+ New Task</button>
+      <button class="btn-light" data-modal-target="#createSubtaskModal">+ New Subtask</button>
+    </div>
+  </div>
+
+  <form method="GET" class="filters">
+    <input type="text" name="search" placeholder="Search task, project..." value="{{ filters.search }}" />
+    <select name="status">
+      <option value="">All Statuses</option>
+      {% for value in task_statuses %}
+        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <select name="severity">
+      <option value="">All Severities</option>
+      {% for value in task_severities %}
+        <option value="{{ value }}" {% if filters.severity == value %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <select name="project_id">
+      <option value="">All Projects</option>
+      {% for project in projects %}
+        <option value="{{ project.id }}" {% if filters.project_id == project.id|string %}selected{% endif %}>{{ project.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn-primary">Apply</button>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Project</th>
+          <th>Assignee</th>
+          <th>Severity</th>
+          <th>Status</th>
+          <th>Due Date</th>
+          <th>Subtasks</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in task_pagination.items %}
+          <tr>
+            <td>{{ task.title }}</td>
+            <td>{{ task.project.name }}</td>
+            <td>{{ task.assignee.username if task.assignee else "Unassigned" }}</td>
+            <td>{{ task.severity }}</td>
+            <td><span class="status {{ task.status|lower|replace(' ', '-') }}">{{ task.status }}</span></td>
+            <td>
+              {% if task.due_date %}
+                {{ task.due_date }}
+                {% if task.status != "Completed" and task.due_date < today %}
+                  <span class="status overdue">Overdue</span>
+                {% endif %}
+              {% else %}
+                <span class="status no-deadline">No Deadline</span>
+              {% endif %}
+            </td>
+            <td>{{ task.subtasks|length }}</td>
+            <td class="actions">
+              <button
+                class="btn-light"
+                data-modal-target="#editTaskModal"
+                data-task-id="{{ task.id }}"
+                data-task-title="{{ task.title }}"
+                data-task-description="{{ task.description or '' }}"
+                data-task-project="{{ task.project_id }}"
+                data-task-user="{{ task.assigned_to or '' }}"
+                data-task-severity="{{ task.severity }}"
+                data-task-status="{{ task.status }}"
+                data-task-start="{{ task.start_date }}"
+                data-task-due="{{ task.due_date }}"
+              >
+                Edit
+              </button>
+              <form method="POST" action="{{ url_for('admin.delete_task', task_id=task.id) }}">
+                <button type="submit" class="btn-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="muted">No tasks found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination">
+    {% if task_pagination.has_prev %}
+      <a href="{{ url_for('admin.dashboard', page=task_pagination.prev_num, search=filters.search, status=filters.status, severity=filters.severity, project_id=filters.project_id) }}">Previous</a>
+    {% endif %}
+    <span>Page {{ task_pagination.page }} of {{ task_pagination.pages or 1 }}</span>
+    {% if task_pagination.has_next %}
+      <a href="{{ url_for('admin.dashboard', page=task_pagination.next_num, search=filters.search, status=filters.status, severity=filters.severity, project_id=filters.project_id) }}">Next</a>
+    {% endif %}
+  </div>
+</section>
+
+<div id="createProjectModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Create Project</h3>
+    <form method="POST" action="{{ url_for('admin.create_project') }}">
+      <label>Name</label>
+      <input type="text" name="name" required />
+      <label>Description</label>
+      <textarea name="description"></textarea>
+      <label>Start Date</label>
+      <input type="date" name="start_date" required />
+      <label>End Date</label>
+      <input type="date" name="end_date" required />
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Create</button>
+        <button type="button" class="btn-light close-modal">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="editProjectModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Edit Project</h3>
+    <form id="editProjectForm" method="POST">
+      <label>Name</label>
+      <input id="editProjectName" type="text" name="name" required />
+      <label>Description</label>
+      <textarea id="editProjectDescription" name="description"></textarea>
+      <label>Start Date</label>
+      <input id="editProjectStart" type="date" name="start_date" required />
+      <label>End Date</label>
+      <input id="editProjectEnd" type="date" name="end_date" required />
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Update</button>
+        <button type="button" class="btn-light close-modal">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="createTaskModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Create Task</h3>
+    <form method="POST" action="{{ url_for('admin.create_task') }}">
+      <label>Project</label>
+      <select name="project_id" required>
+        {% for project in projects %}
+          <option value="{{ project.id }}">{{ project.name }}</option>
+        {% endfor %}
+      </select>
+      <label>Title</label>
+      <input type="text" name="title" required />
+      <label>Description</label>
+      <textarea name="description"></textarea>
+      <label>Assigned User</label>
+      <select name="assigned_to">
+        <option value="">Unassigned</option>
+        {% for user in users %}
+          <option value="{{ user.id }}">{{ user.username }} ({{ user.role }})</option>
+        {% endfor %}
+      </select>
+      <label>Start Date</label>
+      <input type="date" name="start_date" required />
+      <label>Due Date</label>
+      <input type="date" name="due_date" />
+      <label>Severity</label>
+      <select name="severity">
+        {% for value in task_severities %}
+          <option value="{{ value }}">{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label>Status</label>
+      <select name="status">
+        {% for value in task_statuses %}
+          <option value="{{ value }}">{{ value }}</option>
+        {% endfor %}
+      </select>
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Create</button>
+        <button type="button" class="btn-light close-modal">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="editTaskModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Edit Task</h3>
+    <form id="editTaskForm" method="POST">
+      <label>Project</label>
+      <select id="editTaskProject" name="project_id" required>
+        {% for project in projects %}
+          <option value="{{ project.id }}">{{ project.name }}</option>
+        {% endfor %}
+      </select>
+      <label>Title</label>
+      <input id="editTaskTitle" type="text" name="title" required />
+      <label>Description</label>
+      <textarea id="editTaskDescription" name="description"></textarea>
+      <label>Assigned User</label>
+      <select id="editTaskUser" name="assigned_to">
+        <option value="">Unassigned</option>
+        {% for user in users %}
+          <option value="{{ user.id }}">{{ user.username }} ({{ user.role }})</option>
+        {% endfor %}
+      </select>
+      <label>Start Date</label>
+      <input id="editTaskStart" type="date" name="start_date" required />
+      <label>Due Date</label>
+      <input id="editTaskDue" type="date" name="due_date" />
+      <label>Severity</label>
+      <select id="editTaskSeverity" name="severity">
+        {% for value in task_severities %}
+          <option value="{{ value }}">{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label>Status</label>
+      <select id="editTaskStatus" name="status">
+        {% for value in task_statuses %}
+          <option value="{{ value }}">{{ value }}</option>
+        {% endfor %}
+      </select>
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Update</button>
+        <button type="button" class="btn-light close-modal">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="createSubtaskModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Create Subtask</h3>
+    <form method="POST" action="{{ url_for('admin.create_subtask') }}">
+      <label>Parent Task</label>
+      <select name="task_id" required>
+        {% for task in task_pagination.items %}
+          <option value="{{ task.id }}">{{ task.title }}</option>
+        {% endfor %}
+      </select>
+      <label>Subtask Title</label>
+      <input type="text" name="title" required />
+      <label>Status</label>
+      <select name="status">
+        {% for value in task_statuses %}
+          <option value="{{ value }}">{{ value }}</option>
+        {% endfor %}
+      </select>
+      <label>Due Date</label>
+      <input type="date" name="due_date" />
+      <div class="modal-actions">
+        <button type="submit" class="btn-primary">Create</button>
+        <button type="button" class="btn-light close-modal">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

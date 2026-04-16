@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Project Management{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="brand">
+          <h2>PM Suite</h2>
+          <p>Project Control</p>
+        </div>
+        <nav>
+          {% if current_user.role == "admin" %}
+            <a href="{{ url_for('admin.dashboard') }}" class="nav-link">Dashboard</a>
+          {% else %}
+            <a href="{{ url_for('user.dashboard') }}" class="nav-link">Dashboard</a>
+          {% endif %}
+          <a href="{{ url_for('auth.logout') }}" class="nav-link danger">Logout</a>
+        </nav>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <h1>{% block heading %}Dashboard{% endblock %}</h1>
+            <p class="muted">Welcome, {{ current_user.username }} ({{ current_user.role|title }})</p>
+          </div>
+          <div class="notification-area">
+            <button id="notifToggle" class="notif-btn">
+              Notifications <span id="notifCount" class="badge">0</span>
+            </button>
+            <div id="notifDropdown" class="notif-dropdown hidden">
+              <div class="notif-header">
+                <strong>Unread Notifications</strong>
+                <button id="markAllReadBtn" type="button">Mark all read</button>
+              </div>
+              <ul id="notifList">
+                {% for notif in notifications %}
+                  <li data-id="{{ notif.id }}">
+                    <span class="notif-type {{ notif.type }}">{{ notif.type|upper }}</span>
+                    <p>{{ notif.message }}</p>
+                    <small>{{ notif.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                  </li>
+                {% else %}
+                  <li class="muted">No new notifications.</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <section class="flash-wrap">
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            </section>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  {% else %}
+    {% block auth_content %}{% endblock %}
+  {% endif %}
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
